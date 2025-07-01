@@ -4,6 +4,7 @@ Adapted from
 [Screenplay Format Guide: Margin Settings - Story Sense®](https://www.storysense.com/format/margins.htm)
 But ahh, still looks weird. I'm eyeballing values based on comparing the styling with images of printed-out familiar screenplays
 */
+@import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
 
 .markdown-preview-view.fountain,
 .markdown-source-view.mod-cm6.fountain {

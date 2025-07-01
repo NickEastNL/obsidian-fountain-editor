@@ -10,6 +10,7 @@
 	.fountain-scene-heading,
 	.cm-fountain-scene-heading {
 		font-weight: var(--font-bold);
+		text-transform: uppercase;
 	}
 
 	.fountain-parenthetical,
@@ -21,9 +22,17 @@
 		font-style: italic;
 	}
 
+	.fountain-parenthetical,
+	.fountain-character-extension,
+	.cm-fountain-parenthetical,
+	.cm-fountain-character-extension {
+		opacity: 0.5;
+	}
+
 	.fountain-transition,
 	.cm-fountain-transition {
 		font-weight: var(--font-bold);
+		text-transform: uppercase;
 		text-align: right;
 
 		.cm-quote-1:not(.cm-formatting) {
@@ -122,5 +131,15 @@
 			visibility: hidden;
 			display: inherit;
 		}
+	}
+}
+
+.markdown-preview-view.fountain {
+	.fountain-scene-heading {
+		margin: 2em 0 1em !important;
+	}
+
+	.fountain-character {
+		margin-top: 1em !important;
 	}
 }
