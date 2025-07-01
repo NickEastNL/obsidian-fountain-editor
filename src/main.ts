@@ -100,24 +100,96 @@ export default class FountainPlugin extends Plugin {
 			if (cssClasses.includes('fountain')) isFountain = true;
 		}
 
-		if (!isFountain) {
+		if (!isFountain || !file) {
 			this.statusBarItem!.style.display = 'none';
 			return;
 		}
 
 		const globPatterns = this.settings.fountainGlobPatterns;
-		const files = this.app.vault.getMarkdownFiles();
-		const fountainFiles = files.filter((f) =>
-			micromatch.isMatch(f.path, globPatterns),
-		);
+		let matchedPattern: string | null = null;
+		let matchedRoot: string | null = null;
+
+		// Find the first pattern that matches the current file
+		for (const pattern of globPatterns) {
+			if (micromatch.isMatch(file.path, pattern)) {
+				matchedPattern = pattern;
+				// Try to extract the base folder from the pattern and file path
+				// e.g. pattern: "Episodes/Episode*/**/*.md", file: "Episodes/Episode 1/scene1.md"
+				// matchedBase: "Episodes/Episode 1"
+				const patternParts = pattern.split('/');
+				const fileParts = file.path.split('/');
+
+				// Find the last non-wildcard pattern part (not *, **, or containing *)
+				let lastNonWildcardIdx = -1;
+				for (let i = 0; i < patternParts.length; i++) {
+					const pat = patternParts[i];
+					if (pat !== '**' && pat !== '*' && !pat.includes('*')) {
+						lastNonWildcardIdx = i;
+					}
+				}
+
+				// matchedRoot is the path up to and including the last non-wildcard part
+				if (lastNonWildcardIdx >= 0) {
+					matchedRoot = fileParts
+						.slice(0, lastNonWildcardIdx + 1)
+						.join('/');
+				} else {
+					// If no non-wildcard part, use the first part (e.g. "Episodes")
+					matchedRoot = fileParts[0];
+				}
+				break;
+			}
+		}
+
+		let filesToCount: TFile[] = [];
+		if (matchedPattern && matchedRoot) {
+			// Only count files that match the same pattern AND are under the same root as the current file
+			filesToCount = this.app.vault
+				.getMarkdownFiles()
+				.filter(
+					(f) =>
+						micromatch.isMatch(f.path, matchedPattern!) &&
+						(f.path === matchedRoot ||
+							f.path.startsWith(matchedRoot + '/')),
+				);
+		} else {
+			// If no pattern matches, only count the current file
+			filesToCount = [file];
+		}
 
 		let total = 0;
-		for (const file of fountainFiles) {
-			const content = await this.app.vault.read(file);
+		for (const file of filesToCount) {
+			let content = await this.app.vault.read(file);
+
+			// Remove frontmatter
+			content = content.replace(/^---[\s\S]*?---\s*/m, '');
+
+			// Remove Obsidian callouts (```ad-...``` blocks and > [!...] lines)
+			content = content.replace(/```ad-[\s\S]*?```/g, '');
+			content = content.replace(
+				/^> \[!.*\][\s\S]*?(?=^$|^#|\n```|\n> \[!|\n-{3,}|$)/gm,
+				'',
+			);
+
+			// Remove Markdown headings
+			content = content.replace(/^#{1,6} .*/gm, '');
+
+			// Remove Obsidian comments (%% ... %%)
+			content = content.replace(/%%[\s\S]*?%%/g, '');
+
+			// Remove code blocks (``` ... ```)
+			content = content.replace(/```[\s\S]*?```/g, '');
+
+			// Remove HTML comments
+			content = content.replace(/<!--[\s\S]*?-->/g, '');
+
+			// Remove empty lines
+			content = content.replace(/^\s*$/gm, '');
+
 			if (this.settings.useWordCount) {
 				total += content.split(/\s+/).filter(Boolean).length;
 			} else {
-				total += content.split(/\r?\n/).length;
+				total += content.split(/\r?\n/).filter(Boolean).length;
 			}
 		}
 
@@ -208,7 +280,16 @@ class FountainSettingTab extends PluginSettingTab {
 					}),
 			);
 
-		containerEl.createEl('h2', { text: 'Fountain Note Glob Patterns' });
+		containerEl.createEl('h2', { text: 'Glob Patterns' });
+		containerEl.createEl('p', {
+			text: `
+				These patterns determine which files are counted in the status bar. Patterns are matched against the file paths.
+
+				For example, "Scripts/**/*" will match all files in the Scripts folder and its subfolders.
+				
+				You can also use wildcards like "Episode*/**/*" to match all files in any folder starting with "Episode".
+				Each parent "Episode" folder will be counted as a separate root.`,
+		});
 
 		this.plugin.settings.fountainGlobPatterns.forEach((pattern, idx) => {
 			const setting = new Setting(containerEl)
